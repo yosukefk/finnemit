@@ -13,7 +13,7 @@ import numpy as np
 import pkg_resources
 
 
-def get_emissions(infile, outfile=None, fuelin=None, emisin=None):
+def get_emissions(infile, outfile=None, fuelin=None, emisin=None, assume_majority_lct_input=True):
     """Get emissions estimates with FINN
 
     Args:
@@ -24,10 +24,16 @@ def get_emissions(infile, outfile=None, fuelin=None, emisin=None):
             formatted like the file finnemit/data/fuel-loads.csv
         emisin (str) - optional path to an emissions file. This must be
             formatted like the file finnemit/data/emission-factors.csv
+        assume_majority_lct_input (bool) - 
+            True: assume one record par polygon, flct (fractional cover by LCT) ignored
+            False: assume that flct adds up to one, and use it as fractional contribution of each LCT to polygon
+            True is traditional FINN behavior, False is experimental calculation to improve repeatability
+            No check was perfromed for assumption, make sure that you generate such file from preprocessor!
 
     Returns:
         A dictionary summarizing emission totals, and writes a file to outfile.
     """
+    print("option assume_majority_lct_input: ", assume_majority_lct_input)
 
     # USER INPUTS --- EDIT DATE AND SCENARIO HERE - this is for file naming
     # NOTE: ONLY LCT - Don't really need this
@@ -109,6 +115,7 @@ def get_emissions(infile, outfile=None, fuelin=None, emisin=None):
     if outfile is None:
         outfile = re.sub("\\.csv$", "_out.csv", infile)
     map = pd.read_csv(infile)
+    # TODO i don't think christine likes to drop record silently.  count this and included in the log
     map = map[map["v_regnum"].notnull()]
     # pandas dont have interger NA, so we can either put unused value, or just filter out, like Max is doing above
     map = map[map["v_lct"].notnull()]
@@ -564,6 +571,10 @@ def get_emissions(infile, outfile=None, fuelin=None, emisin=None):
         # Emissions = area*BE*BMASS*EF
         # Convert units to consistent units
         areanow = area[j] * 1.0e6  # convert km2 --> m2
+        # if input is for fractional contribution to each lct (as opposed to only majority lct), 
+        # flct is multiplied to account for contibution of particular lct
+        if not assume_majority_lct_input:
+            areanow = areanow * flct[j]
         bmass = bmass / 1000.0  # convert g dm/m2 to kg dm/m2
 
         # CW: MAY 29, 2015: Scale grassland and cropland fire areas
